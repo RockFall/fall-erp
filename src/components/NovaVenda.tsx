@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { CLIENTES, CHACARAS, VENDAS, fmtBRL } from '@/lib/data'
+import { fmtBRL } from '@/lib/domain'
 import {
   Avatar, Badge, Card, Icon, Button,
   Input, Select, FieldLabel, SectionHeader,
 } from '@/components/ui'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 type Variant = 'wizard' | 'single'
 
@@ -27,6 +28,7 @@ interface Form {
 }
 
 function NovaVendaWizard() {
+  const { clientes, chacaras, vendas } = useRuntimeData()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<Form>({
     cliente_id: '', cliente_novo: '', telefone: '',
@@ -38,9 +40,9 @@ function NovaVendaWizard() {
   })
   const update = <K extends keyof Form>(k: K, v: Form[K]) => setForm(p => ({ ...p, [k]: v }))
 
-  const disponiveis = CHACARAS.filter(c => c.status === 'disponivel')
-  const chacaraSel = CHACARAS.find(c => c.id === form.chacara_id)
-  const clienteSel = CLIENTES.find(c => c.id === form.cliente_id)
+  const disponiveis = chacaras.filter(c => c.status === 'disponivel')
+  const chacaraSel = chacaras.find(c => c.id === form.chacara_id)
+  const clienteSel = clientes.find(c => c.id === form.cliente_id)
 
   return (
     <div>
@@ -75,7 +77,7 @@ function NovaVendaWizard() {
               <FieldLabel>Cliente</FieldLabel>
               <Select value={form.cliente_id} onChange={e => update('cliente_id', e.target.value)}>
                 <option value="">— Selecionar —</option>
-                {CLIENTES.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 <option value="novo">+ Novo cliente</option>
               </Select>
             </div>
@@ -93,8 +95,8 @@ function NovaVendaWizard() {
                   <div style={{ fontSize: 11, color: 'var(--cl-t7)' }}>{clienteSel.telefone}</div>
                 </div>
                 <div style={{ flex: 1 }} />
-                {VENDAS.filter(v => v.cliente_id === clienteSel.id).length > 0 && (
-                  <Badge tone="info">{VENDAS.filter(v => v.cliente_id === clienteSel.id).length} contratos ativos</Badge>
+                {vendas.filter(v => v.cliente_id === clienteSel.id).length > 0 && (
+                  <Badge tone="info">{vendas.filter(v => v.cliente_id === clienteSel.id).length} contratos ativos</Badge>
                 )}
               </div>
             )}
@@ -207,6 +209,7 @@ function NovaVendaWizard() {
 }
 
 function NovaVendaSinglePage() {
+  const { clientes, chacaras } = useRuntimeData()
   const [form, setForm] = useState({
     cliente_id: '', chacara_id: '',
     valor_total: 85000, valor_entrada: 8500,
@@ -215,7 +218,7 @@ function NovaVendaSinglePage() {
     entrada_dividida: false, parcelas_entrada: 1,
   })
   const update = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm(p => ({ ...p, [k]: v }))
-  const disponiveis = CHACARAS.filter(c => c.status === 'disponivel')
+  const disponiveis = chacaras.filter(c => c.status === 'disponivel')
 
   return (
     <div>
@@ -230,7 +233,7 @@ function NovaVendaSinglePage() {
                 <FieldLabel>Cliente</FieldLabel>
                 <Select value={form.cliente_id} onChange={e => update('cliente_id', e.target.value)}>
                   <option value="">— Selecionar —</option>
-                  {CLIENTES.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </Select>
               </div>
               <div>

@@ -1,10 +1,11 @@
 'use client'
 
 import { useMemo } from 'react'
-import { VENDAS, CLIENTES, CHACARAS, fmtBRL, fmtDate, fmtDateLong } from '@/lib/data'
+import { fmtBRL, fmtDate, fmtDateLong } from '@/lib/domain'
 import {
   Avatar, Badge, ProgressBar, Card, Icon, Button, SectionHeader, TH, TD,
 } from '@/components/ui'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 type ExtratoVariant = 'timeline' | 'tabela' | 'cards'
 
@@ -146,9 +147,12 @@ interface Props {
 }
 
 export default function ExtratoCliente({ vendaId, variant = 'timeline', onBack }: Props) {
-  const venda = VENDAS.find(v => v.id === vendaId) ?? VENDAS[0]
-  const cliente = CLIENTES.find(c => c.id === venda.cliente_id)!
-  const chacara = CHACARAS.find(c => c.id === venda.chacara_id)!
+  const { vendas, clientes, chacaras } = useRuntimeData()
+  const venda = vendas.find(v => v.id === vendaId) ?? vendas[0]
+  if (!venda) return null
+  const cliente = clientes.find(c => c.id === venda.cliente_id)
+  const chacara = chacaras.find(c => c.id === venda.chacara_id)
+  if (!cliente || !chacara) return null
 
   const parcelas = useMemo((): Parcela[] => {
     const out: Parcela[] = []

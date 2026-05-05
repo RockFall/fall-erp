@@ -1,13 +1,24 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { CHACARAS, CLIENTES, STATUS_CHACARA, type StatusChacara } from '@/lib/data'
+import { STATUS_CHACARA, type StatusChacara } from '@/lib/domain'
 import { Badge, StatusDot, TH, TD, FilterPill } from '@/components/ui'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
+
+type ChacaraView = {
+  id: string
+  identificador: string
+  quadra: string
+  numero: number
+  status: StatusChacara
+  cliente_id: string | null
+}
+type ClienteLite = { id: string; nome: string; telefone: string | null }
 
 // ── Mapa (agrupado por quadra) ─────────────────────────────────
-function ChacarasMapa({ lista }: { lista: typeof CHACARAS }) {
+function ChacarasMapa({ lista }: { lista: ChacaraView[] }) {
   const quadras = useMemo(() => {
-    const map: Record<string, typeof CHACARAS> = {}
+    const map: Record<string, ChacaraView[]> = {}
     lista.forEach(c => {
       if (!map[c.quadra]) map[c.quadra] = []
       map[c.quadra].push(c)
@@ -48,12 +59,12 @@ function ChacarasMapa({ lista }: { lista: typeof CHACARAS }) {
 }
 
 // ── Card grid ──────────────────────────────────────────────────
-function ChacarasCardGrid({ lista }: { lista: typeof CHACARAS }) {
+function ChacarasCardGrid({ lista, clientes }: { lista: ChacaraView[]; clientes: ClienteLite[] }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
       {lista.map(c => {
         const s = STATUS_CHACARA[c.status]
-        const cliente = CLIENTES.find(cl => cl.id === c.cliente_id)
+        const cliente = clientes.find(cl => cl.id === c.cliente_id)
         const tone: Parameters<typeof Badge>[0]['tone'] =
           c.status === 'em_dia' ? 'success' : c.status === 'atrasado' ? 'danger'
           : c.status === 'disponivel' ? 'muted' : c.status === 'em_construcao' ? 'warning' : 'info'
@@ -77,7 +88,7 @@ function ChacarasCardGrid({ lista }: { lista: typeof CHACARAS }) {
 }
 
 // ── Lista ──────────────────────────────────────────────────────
-function ChacarasLista({ lista }: { lista: typeof CHACARAS }) {
+function ChacarasLista({ lista, clientes }: { lista: ChacaraView[]; clientes: ClienteLite[] }) {
   return (
     <div style={{ border: '1px solid var(--cl-bd)', borderRadius: 10, overflow: 'hidden' }}>
       <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
@@ -91,7 +102,7 @@ function ChacarasLista({ lista }: { lista: typeof CHACARAS }) {
         </thead>
         <tbody>
           {lista.map(c => {
-            const cliente = CLIENTES.find(cl => cl.id === c.cliente_id)
+            const cliente = clientes.find(cl => cl.id === c.cliente_id)
             return (
               <tr key={c.id} style={{ borderBottom: '1px solid var(--cl-bd4)' }}>
                 <td style={TD}><strong>{c.identificador}</strong></td>
@@ -113,13 +124,14 @@ function ChacarasLista({ lista }: { lista: typeof CHACARAS }) {
 
 // ── Main component ─────────────────────────────────────────────
 export default function ChacarasComponent({ compact = false }: { compact?: boolean }) {
+  const { chacaras, clientes } = useRuntimeData()
   const [vis, setVis] = useState<'mapa' | 'grid' | 'lista'>('mapa')
   const [filtro, setFiltro] = useState<StatusChacara | 'todas'>('todas')
 
   const lista = useMemo(() => {
-    if (filtro === 'todas') return CHACARAS
-    return CHACARAS.filter(c => c.status === filtro)
-  }, [filtro])
+    if (filtro === 'todas') return chacaras
+    return chacaras.filter(c => c.status === filtro)
+  }, [filtro, chacaras])
 
   return (
     <div>
@@ -152,8 +164,8 @@ export default function ChacarasComponent({ compact = false }: { compact?: boole
       )}
 
       {vis === 'mapa' && <ChacarasMapa lista={lista} />}
-      {vis === 'grid' && <ChacarasCardGrid lista={lista} />}
-      {vis === 'lista' && <ChacarasLista lista={lista} />}
+      {vis === 'grid' && <ChacarasCardGrid lista={lista} clientes={clientes} />}
+      {vis === 'lista' && <ChacarasLista lista={lista} clientes={clientes} />}
     </div>
   )
 }

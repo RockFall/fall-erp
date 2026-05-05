@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { VENDAS, CLIENTES, fmtBRL } from '@/lib/data'
+import { fmtBRL } from '@/lib/domain'
 import { Badge, Icon, Button, SectionHeader, Card, TH, TD } from '@/components/ui'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 type Step = 'upload' | 'preview' | 'done'
 
 export default function Importar() {
+  const { vendas, clientes } = useRuntimeData()
   const [step, setStep] = useState<Step>('upload')
 
   return (
@@ -36,11 +38,11 @@ export default function Importar() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--cl-th)' }}>Pré-visualização — contratos.csv</div>
-                <div style={{ fontSize: 12, color: 'var(--cl-t7)', marginTop: 2 }}>52 linhas detectadas · 0 erros · 3 clientes novos</div>
+                <div style={{ fontSize: 12, color: 'var(--cl-t7)', marginTop: 2 }}>{vendas.length} linhas detectadas · 0 erros · 0 clientes novos</div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button variant="ghost" onClick={() => setStep('upload')}>Cancelar</Button>
-                <Button variant="primary" onClick={() => setStep('done')}>Importar 52 contratos</Button>
+                <Button variant="primary" onClick={() => setStep('done')}>Importar {vendas.length} contratos</Button>
               </div>
             </div>
             <div style={{ border: '1px solid var(--cl-bd)', borderRadius: 10, overflow: 'hidden', maxHeight: 320, overflowY: 'auto' }}>
@@ -57,8 +59,8 @@ export default function Importar() {
                   </tr>
                 </thead>
                 <tbody>
-                  {VENDAS.slice(0, 12).map((v, i) => {
-                    const c = CLIENTES.find(cl => cl.id === v.cliente_id)!
+                  {vendas.slice(0, 12).map((v, i) => {
+                    const c = clientes.find(cl => cl.id === v.cliente_id)!
                     const novo = i % 5 === 0
                     return (
                       <tr key={v.id} style={{ borderBottom: '1px solid var(--cl-bd4)' }}>
@@ -89,7 +91,7 @@ export default function Importar() {
             }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12l5 5L20 7" /></svg>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>52 contratos importados!</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>{vendas.length} contratos importados!</div>
             <div style={{ fontSize: 12, color: 'var(--cl-t7)', marginBottom: 18 }}>
               3 clientes novos cadastrados · plano de pagamentos gerado
             </div>

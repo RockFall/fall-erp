@@ -13,7 +13,8 @@ import Clientes            from '@/components/Clientes'
 import ChacarasComponent   from '@/components/Chacaras'
 import Importar            from '@/components/Importar'
 import { Avatar, Icon, Card, SectionHeader } from '@/components/ui'
-import { CHACARAS, labelMes, CURRENT_MONTH } from '@/lib/data'
+import { labelMes } from '@/lib/domain'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 const THEME_KEY = 'fall-erp-theme'
 
@@ -46,6 +47,7 @@ const NAV: NavItem[] = [
 ]
 
 export default function AppShell() {
+  const { chacaras } = useRuntimeData()
   const [tela, setTela]       = useState<Tela>('dashboard')
   const [extrato, setExtrato] = useState<string | null>(null)
   const [dark, setDark]       = useState(false)
@@ -147,7 +149,7 @@ export default function AppShell() {
             <Avatar nome="Geovanin" size={28} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--cl-th)' }}>Geovanin</div>
-              <div style={{ fontSize: 10, color: 'var(--cl-t7)' }}>Sócio · {labelMes(CURRENT_MONTH)}</div>
+              <div style={{ fontSize: 10, color: 'var(--cl-t7)' }}>Sócio · {labelMes(new Date().toISOString().slice(0, 7))}</div>
             </div>
             <button
               onClick={toggleDark}
@@ -190,6 +192,7 @@ function TelaAtiva({
   openExtrato: (id: string) => void
   goBack: () => void
 }) {
+  const { chacaras } = useRuntimeData()
   switch (tela) {
     case 'dashboard':
       return <Dashboard variation="C" />
@@ -212,7 +215,7 @@ function TelaAtiva({
         <div>
           <SectionHeader
             title="Mapa de chácaras"
-            subtitle={`${CHACARAS.length} chácaras · ${CHACARAS.filter(c => c.status === 'disponivel').length} disponíveis · ${CHACARAS.filter(c => c.status === 'em_construcao').length} em construção`}
+            subtitle={`${chacaras.length} chácaras · ${chacaras.filter(c => c.status === 'disponivel').length} disponíveis · 0 em construção`}
           />
           <Card padding={18}>
             <ChacarasComponent />

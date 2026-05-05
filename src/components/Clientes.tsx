@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { CLIENTES, VENDAS, fmtBRL } from '@/lib/data'
+import { fmtBRL } from '@/lib/domain'
 import { Avatar, Badge, Icon, Button, Input, SectionHeader } from '@/components/ui'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 interface Props {
   onOpenExtrato: (vendaId: string) => void
@@ -10,32 +11,33 @@ interface Props {
 
 export default function Clientes({ onOpenExtrato }: Props) {
   const [busca, setBusca] = useState('')
+  const { clientes, vendas } = useRuntimeData()
 
   const lista = useMemo(() => {
-    const enrich = CLIENTES.map(c => {
-      const vendas = VENDAS.filter(v => v.cliente_id === c.id)
-      const atrasado = vendas.some(v => v.status === 'atrasado')
+    const enrich = clientes.map(c => {
+      const vendasCliente = vendas.filter(v => v.cliente_id === c.id)
+      const atrasado = vendasCliente.some(v => v.status === 'atrasado')
       return {
         ...c,
-        chacaras: vendas.map(v => v.chacara),
-        n_contratos: vendas.length,
-        primeira_venda: vendas[0]?.id,
-        status: atrasado ? 'atrasado' : vendas.length ? 'em_dia' : 'sem_contrato',
-        valor_total: vendas.reduce((a, v) => a + v.valor_total, 0),
+        chacaras: vendasCliente.map(v => v.chacara),
+        n_contratos: vendasCliente.length,
+        primeira_venda: vendasCliente[0]?.id,
+        status: atrasado ? 'atrasado' : vendasCliente.length ? 'em_dia' : 'sem_contrato',
+        valor_total: vendasCliente.reduce((a, v) => a + v.valor_total, 0),
       }
     })
     if (!busca.trim()) return enrich
     const q = busca.toLowerCase()
     return enrich.filter(c => c.nome.toLowerCase().includes(q))
-  }, [busca])
+  }, [busca, clientes, vendas])
 
-  const comMultiplas = CLIENTES.filter(c => VENDAS.filter(v => v.cliente_id === c.id).length > 1).length
+  const comMultiplas = clientes.filter(c => vendas.filter(v => v.cliente_id === c.id).length > 1).length
 
   return (
     <div>
       <SectionHeader
         title="Clientes"
-        subtitle={`${CLIENTES.length} cadastrados · ${comMultiplas} com múltiplas chácaras`}
+        subtitle={`${clientes.length} cadastrados · ${comMultiplas} com múltiplas chácaras`}
         right={<Button variant="primary" size="md">{Icon.plus} Novo cliente</Button>}
       />
 

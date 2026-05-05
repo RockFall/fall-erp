@@ -1,48 +1,57 @@
 'use client'
 
 import { useMemo } from 'react'
-import {
-  PAGAMENTOS_MES, GASTOS, HISTORICO_MENSAL, CHACARAS, VENDAS,
-  CURRENT_MONTH, TODAY_ISO,
-  fmtBRL, fmtDate, labelMes,
-  STATUS_CHACARA,
-} from '@/lib/data'
+import { fmtBRL, fmtDate, labelMes, STATUS_CHACARA } from '@/lib/domain'
 import {
   Avatar, Badge, Sparkline, ProgressBar, Card, KpiTile,
   Icon, Button, SectionHeader,
 } from '@/components/ui'
 import ChacarasComponent from '@/components/Chacaras'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 // ── Shared stats hook ──────────────────────────────────────────
 function useDashStats() {
+  const { pagamentosMes, gastos, vendas, chacaras, pagamentos } = useRuntimeData()
+  const CURRENT_MONTH = new Date().toISOString().slice(0, 7)
+  const TODAY_ISO = new Date().toISOString().slice(0, 10)
   return useMemo(() => {
-    const recebido = PAGAMENTOS_MES.filter(p => p.foi_pago).reduce((a, p) => a + (p.valor_pago ?? 0), 0)
-    const pendente = PAGAMENTOS_MES.filter(p => !p.foi_pago).reduce((a, p) => a + p.valor_referencia, 0)
-    const atrasados = PAGAMENTOS_MES.filter(p => {
+    const recebido = pagamentosMes.filter(p => p.foi_pago).reduce((a, p) => a + (p.valor_pago ?? 0), 0)
+    const pendente = pagamentosMes.filter(p => !p.foi_pago).reduce((a, p) => a + p.valor_referencia, 0)
+    const atrasados = pagamentosMes.filter(p => {
       if (p.foi_pago) return false
       return new Date(p.data_vencimento) < new Date(TODAY_ISO)
     })
-    const vencendoEssaSemana = PAGAMENTOS_MES.filter(p => {
+    const vencendoEssaSemana = pagamentosMes.filter(p => {
       if (p.foi_pago) return false
       const venc = new Date(p.data_vencimento)
       const hoje = new Date(TODAY_ISO)
       const diff = (venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)
       return diff >= 0 && diff <= 7
     })
-    const despesas = GASTOS.filter(g => g.data_gasto.startsWith(CURRENT_MONTH)).reduce((a, g) => a + g.valor, 0)
+    const despesas = gastos.filter(g => g.data_gasto.startsWith(CURRENT_MONTH)).reduce((a, g) => a + g.valor, 0)
     const lucro = recebido - despesas
     const splitGeo = lucro > 0 ? lucro * 0.5 : 0
     const splitPaulo = lucro > 0 ? lucro * 0.5 : 0
-    const contratosAtivos = VENDAS.length
-    const chacarasDisponiveis = CHACARAS.filter(c => c.status === 'disponivel').length
-    const receitaSeries = HISTORICO_MENSAL.map(h => h.receita)
-    const despesaSeries = HISTORICO_MENSAL.map(h => h.despesas)
+    const contratosAtivos = vendas.length
+    const chacarasDisponiveis = chacaras.filter(c => c.status === 'disponivel').length
+    const receitaSeries = Array.from({ length: 6 }).map((_, i) => {
+      const d = new Date()
+      d.setMonth(d.getMonth() - (5 - i))
+      const m = d.toISOString().slice(0, 7)
+      return pagamentos.filter(p => p.foi_pago && p.data_pagamento?.startsWith(m)).reduce((a, p) => a + (p.valor_pago ?? 0), 0)
+    })
+    const despesaSeries = Array.from({ length: 6 }).map((_, i) => {
+      const d = new Date()
+      d.setMonth(d.getMonth() - (5 - i))
+      const m = d.toISOString().slice(0, 7)
+      return gastos.filter(g => g.data_gasto.startsWith(m)).reduce((a, g) => a + g.valor, 0)
+    })
     return {
       recebido, pendente, atrasados, vencendoEssaSemana, despesas, lucro,
       splitGeo, splitPaulo, contratosAtivos, chacarasDisponiveis,
       receitaSeries, despesaSeries,
     }
-  }, [])
+  }, [pagamentosMes, gastos, vendas, chacaras, pagamentos, CURRENT_MONTH, TODAY_ISO])
 }
 
 function Greeting() {
@@ -54,7 +63,7 @@ function Greeting() {
         {sauda}, Geovanin
       </h1>
       <p style={{ fontSize: 12, color: 'var(--cl-t6)', margin: '4px 0 0 0' }}>
-        Hoje é segunda, 04 mai 2026 — {labelMes(CURRENT_MONTH)} em andamento
+        {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })} — em andamento
       </p>
     </div>
   )
@@ -63,16 +72,17 @@ function Greeting() {
 // ── Variação A — KPI cards no topo, atrasos no centro ─────────
 function DashboardA() {
   const s = useDashStats()
+  const todayIso = new Date().toISOString().slice(0, 10)
   return (
     <div>
       <div style={{ marginBottom: 20 }}><Greeting /></div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
         <KpiTile label="Recebido no mês" value={fmtBRL(s.recebido)}
-          sub={`${PAGAMENTOS_MES.filter(p => p.foi_pago).length} de ${PAGAMENTOS_MES.length} parcelas`}
+          sub={`${s.recebido > 0 ? 'Pagamentos processados' : 'Sem pagamentos no mês'}`}
           sparkline={s.receitaSeries} tone="success" />
         <KpiTile label="Pendente" value={fmtBRL(s.pendente)}
-          sub={`${PAGAMENTOS_MES.filter(p => !p.foi_pago).length} parcelas em aberto`} />
+          sub={`${s.vencendoEssaSemana.length} vencendo nesta semana`} />
         <KpiTile label="Em atraso" value={fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
           sub={`${s.atrasados.length} contratos a cobrar`} tone="danger" />
         <KpiTile label="Lucro líquido" value={fmtBRL(s.lucro)}
@@ -93,7 +103,7 @@ function DashboardA() {
           </div>
           <div>
             {s.atrasados.slice(0, 5).map(p => {
-              const diasAtraso = Math.floor((new Date(TODAY_ISO).getTime() - new Date(p.data_vencimento).getTime()) / (1000 * 60 * 60 * 24))
+              const diasAtraso = Math.floor((new Date(todayIso).getTime() - new Date(p.data_vencimento).getTime()) / (1000 * 60 * 60 * 24))
               return (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--cl-bd4)' }}>
                   <Avatar nome={p.nome_cliente} size={32} />
@@ -216,11 +226,11 @@ function DashboardB() {
         <Card padding={0}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--cl-bd4)' }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--cl-th)' }}>Receita por dia de vencimento</div>
-            <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginTop: 2 }}>{labelMes(CURRENT_MONTH)}</div>
+            <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginTop: 2 }}>{labelMes(new Date().toISOString().slice(0, 7))}</div>
           </div>
           <div style={{ padding: 16 }}>
             {[5, 10, 15].map(dia => {
-              const ps = PAGAMENTOS_MES.filter(p => p.dia_vencimento === dia)
+              const ps = s.vencendoEssaSemana.concat(s.atrasados).concat([]).filter(p => p.dia_vencimento === dia)
               const pagas = ps.filter(p => p.foi_pago)
               const total = ps.reduce((a, p) => a + p.valor_referencia, 0)
               const pago = pagas.reduce((a, p) => a + (p.valor_pago ?? 0), 0)
@@ -255,7 +265,7 @@ function DashboardC() {
           color: 'white', border: 'none',
         }}>
           <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Lucro líquido · {labelMes(CURRENT_MONTH)}
+            Lucro líquido · {labelMes(new Date().toISOString().slice(0, 7))}
           </div>
           <div style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em' }}>{fmtBRL(s.lucro)}</div>
           <div style={{ display: 'flex', gap: 24, marginTop: 16, fontSize: 11, opacity: 0.85 }}>
@@ -303,7 +313,7 @@ function DashboardC() {
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cl-th)' }}>Mapa do empreendimento</div>
             <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginTop: 2 }}>
-              {CHACARAS.length} chácaras · {VENDAS.length} contratos ativos
+              {s.chacarasDisponiveis + s.contratosAtivos} chácaras · {s.contratosAtivos} contratos ativos
             </div>
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
@@ -326,14 +336,23 @@ function ChartReceitaDespesa() {
   const W = 800, H = 180, PAD_L = 50, PAD_B = 24, PAD_T = 10, PAD_R = 10
   const innerW = W - PAD_L - PAD_R
   const innerH = H - PAD_T - PAD_B
-  const max = Math.max(...HISTORICO_MENSAL.flatMap(h => [h.receita, h.despesas])) * 1.1
-  const xStep = innerW / (HISTORICO_MENSAL.length - 1)
+  const { pagamentos, gastos } = useRuntimeData()
+  const history = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (5 - i))
+    const mes = d.toISOString().slice(0, 7)
+    const receita = pagamentos.filter(p => p.foi_pago && p.data_pagamento?.startsWith(mes)).reduce((a, p) => a + (p.valor_pago ?? 0), 0)
+    const despesas = gastos.filter(g => g.data_gasto.startsWith(mes)).reduce((a, g) => a + g.valor, 0)
+    return { mes, receita, despesas }
+  })
+  const max = Math.max(...history.flatMap(h => [h.receita, h.despesas]), 1) * 1.1
+  const xStep = innerW / (history.length - 1)
   const y = (v: number) => PAD_T + innerH - (v / max) * innerH
   const x = (i: number) => PAD_L + i * xStep
   const linePath = (key: 'receita' | 'despesas') =>
-    HISTORICO_MENSAL.map((h, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(h[key])}`).join(' ')
+    history.map((h, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(h[key])}`).join(' ')
   const areaPath = (key: 'receita' | 'despesas') =>
-    `${linePath(key)} L ${x(HISTORICO_MENSAL.length - 1)} ${PAD_T + innerH} L ${PAD_L} ${PAD_T + innerH} Z`
+    `${linePath(key)} L ${x(history.length - 1)} ${PAD_T + innerH} L ${PAD_L} ${PAD_T + innerH} Z`
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 200 }}>
@@ -348,7 +367,7 @@ function ChartReceitaDespesa() {
       <path d={areaPath('receita')} fill="var(--cl-chart-fill-receita)" opacity="0.55" />
       <path d={linePath('receita')} fill="none" stroke="var(--cl-chart-stroke-receita)" strokeWidth="2" strokeLinejoin="round" />
       <path d={linePath('despesas')} fill="none" stroke="var(--cl-chart-stroke-despesa)" strokeWidth="2" strokeLinejoin="round" />
-      {HISTORICO_MENSAL.map((h, i) => (
+      {history.map((h, i) => (
         <g key={i}>
           <circle cx={x(i)} cy={y(h.receita)} r="3" fill="var(--cl-chart-stroke-receita)" />
           <circle cx={x(i)} cy={y(h.despesas)} r="3" fill="var(--cl-chart-stroke-despesa)" />

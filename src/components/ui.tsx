@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, type CSSProperties, type ReactNode } from 'react'
-import { initials, colorFromString, textColorFromString } from '@/lib/data'
+import { initials, colorFromString, textColorFromString, STATUS_CHACARA, type StatusChacara } from '@/lib/domain'
 
 // ── Style constants ────────────────────────────────────────────
 export const TH: CSSProperties = {
@@ -91,7 +91,6 @@ export function ProgressBar({ value, max = 100, color = 'var(--cl-chart-stroke-r
 }
 
 // ── StatusDot ──────────────────────────────────────────────────
-import { STATUS_CHACARA, type StatusChacara } from '@/lib/data'
 export function StatusDot({ status }: { status: StatusChacara }) {
   const s = STATUS_CHACARA[status]
   return (

@@ -1,26 +1,29 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { VENDAS, CLIENTES, PAGAMENTOS_MES, fmtBRL, TODAY_ISO } from '@/lib/data'
+import { fmtBRL } from '@/lib/domain'
 import {
   Avatar, Badge, ProgressBar, Card, Icon, Button,
   Input, Select, FieldLabel, SectionHeader, Toast, FilterPill, TH, TD,
 } from '@/components/ui'
+import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 interface Props {
   onOpenExtrato: (vendaId: string) => void
 }
 
 export default function Contratos({ onOpenExtrato }: Props) {
+  const { vendas, clientes, pagamentosMes } = useRuntimeData()
   const [selected, setSelected] = useState(new Set<string>())
   const [filtro, setFiltro] = useState<'todos' | 'em_dia' | 'atrasado'>('todos')
   const [busca, setBusca] = useState('')
   const [bulkOpen, setBulkOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const vendasFull = useMemo(() => VENDAS.map(v => {
-    const cliente = CLIENTES.find(c => c.id === v.cliente_id)!
-    const pagaAtual = PAGAMENTOS_MES.find(p => p.venda_id === v.id)
+  const vendasFull = useMemo(() => vendas.map(v => {
+    const cliente = clientes.find(c => c.id === v.cliente_id)
+    if (!cliente) return null
+    const pagaAtual = pagamentosMes.find(p => p.venda_id === v.id)
     return {
       ...v, cliente,
       pago_mes: pagaAtual?.foi_pago ?? false,
@@ -28,7 +31,7 @@ export default function Contratos({ onOpenExtrato }: Props) {
       valor_mes: pagaAtual?.valor_referencia ?? v.valor_parcela,
       pct_pago: (v.parcelas_pagas / v.total_parcelas) * 100,
     }
-  }), [])
+  }).filter(Boolean), [vendas, clientes, pagamentosMes]) as any[]
 
   const lista = useMemo(() => {
     let l = vendasFull
@@ -64,7 +67,7 @@ export default function Contratos({ onOpenExtrato }: Props) {
     <div>
       <Toast message={toast} onClose={() => setToast(null)} />
       <SectionHeader title="Contratos"
-        subtitle={`${VENDAS.length} contratos ativos · Rancho da Montanha`}
+        subtitle={`${vendas.length} contratos ativos · Rancho da Montanha`}
         right={<Button variant="primary" size="md">{Icon.plus} Nova venda</Button>}
       />
 
@@ -175,7 +178,7 @@ export default function Contratos({ onOpenExtrato }: Props) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
               <div>
                 <FieldLabel>Data de pagamento</FieldLabel>
-                <Input type="date" value={TODAY_ISO} onChange={() => {}} />
+                <Input type="date" value={new Date().toISOString().slice(0, 10)} onChange={() => {}} />
               </div>
               <div>
                 <FieldLabel>Tipo</FieldLabel>
