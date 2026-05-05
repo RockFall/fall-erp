@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+/* ── Dark mode variant ────────────────────────────────── */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Color tokens — light ─────────────────────────────── */
+:root {
+  --cl-bg:  white;
+  --cl-bgr: oklch(0.985 0 0);
+  --cl-bgh: oklch(0.97 0 0);
+  --cl-bd:  oklch(0.93 0 0);
+  --cl-bd2: oklch(0.94 0 0);
+  --cl-bd3: oklch(0.95 0 0);
+  --cl-bd4: oklch(0.96 0 0);
+  --cl-bd5: oklch(0.85 0 0);
+  --cl-bdi: oklch(0.90 0 0);
+  --cl-bds: oklch(0.92 0 0);
+  --cl-th:  oklch(0.18 0 0);
+  --cl-t1:  oklch(0.20 0 0);
+  --cl-t2:  oklch(0.25 0 0);
+  --cl-t3:  oklch(0.30 0 0);
+  --cl-t4:  oklch(0.40 0 0);
+  --cl-t5:  oklch(0.45 0 0);
+  --cl-t6:  oklch(0.50 0 0);
+  --cl-t7:  oklch(0.55 0 0);
+  --cl-t8:  oklch(0.62 0 0);
+  --cl-t9:  oklch(0.65 0 0);
+  --cl-pb:  oklch(0.20 0 0);
+  --cl-pf:  white;
+  --cl-na:  white;
+
+  /* Selected chips, wizard steps */
+  --cl-solid:       oklch(0.20 0 0);
+  --cl-solid-fg:    white;
+  --cl-border-soft: oklch(0.92 0 0);
+  --cl-step-idle:   oklch(0.92 0 0);
+
+  /* Info / callout surfaces */
+  --cl-callout-info-bg:     oklch(0.97 0.02 250);
+  --cl-callout-info-fg:     oklch(0.30 0.10 250);
+  --cl-callout-info-border: oklch(0.85 0.05 250);
+
+  /* Hero card (Dashboard) */
+  --cl-hero-gradient: linear-gradient(135deg, oklch(0.20 0 0), oklch(0.30 0.02 250));
+
+  --cl-banner-danger-bg: oklch(0.97 0.03 28);
+  --cl-banner-danger-bd: oklch(0.90 0.04 28);
+  --cl-banner-danger-fg: oklch(0.40 0.15 28);
+  --cl-banner-danger-sub: oklch(0.50 0.10 28);
+
+  --cl-chart-fill-receita: oklch(0.95 0.04 145);
+
+  --cl-timeline-track:     oklch(0.94 0 0);
+  --cl-timeline-pending:   oklch(0.85 0 0);
+  --cl-surface-atraso:     oklch(0.97 0.03 28);
+  --cl-cal-empty:          oklch(0.985 0 0);
+  --cl-cal-pending-cell:   oklch(0.95 0 0);
+
+  /* Texto de destaque (valores, legendas) */
+  --cl-text-danger:   oklch(0.50 0.16 28);
+  --cl-text-receita:  oklch(0.40 0.12 145);
+  --cl-text-despesa:  oklch(0.50 0.16 28);
+  --cl-hero-sparkline: oklch(0.85 0.10 145);
+  --cl-sparkline-neutral: oklch(0.62 0.13 250);
+
+  /* Gráfico dashboard */
+  --cl-chart-stroke-receita: oklch(0.62 0.13 145);
+  --cl-chart-stroke-despesa: oklch(0.65 0.16 28);
+
+  /* Mapa chácaras — por status (dot=borda, bg=fundo célula, fg=texto/número) */
+  --st-em_dia-dot: oklch(0.72 0.13 145);
+  --st-em_dia-bg:  oklch(0.97 0.02 145);
+  --st-em_dia-fg:  oklch(0.40 0.10 145);
+  --st-atrasado-dot: oklch(0.62 0.18 28);
+  --st-atrasado-bg:  oklch(0.97 0.03 28);
+  --st-atrasado-fg:  oklch(0.45 0.15 28);
+  --st-disponivel-dot: oklch(0.85 0.01 250);
+  --st-disponivel-bg:  oklch(0.97 0.005 250);
+  --st-disponivel-fg:  oklch(0.50 0.02 250);
+  --st-em_construcao-dot: oklch(0.78 0.13 75);
+  --st-em_construcao-bg:  oklch(0.97 0.04 75);
+  --st-em_construcao-fg:  oklch(0.45 0.10 75);
+  --st-reservada-dot: oklch(0.70 0.13 250);
+  --st-reservada-bg:  oklch(0.97 0.02 250);
+  --st-reservada-fg:  oklch(0.45 0.10 250);
+
+  /* Sócios — barras nos cards */
+  --cl-partner-bar-1: oklch(0.55 0.14 250);
+  --cl-partner-bar-2: oklch(0.55 0.14 145);
+
+  /* Badges (soft) */
+  --cl-badge-neutral-bg: oklch(0.96 0.005 250);
+  --cl-badge-neutral-fg: oklch(0.42 0.01 250);
+  --cl-badge-success-bg: oklch(0.96 0.04 145);
+  --cl-badge-success-fg: oklch(0.42 0.12 145);
+  --cl-badge-danger-bg:  oklch(0.96 0.04 28);
+  --cl-badge-danger-fg:  oklch(0.50 0.16 28);
+  --cl-badge-warning-bg: oklch(0.96 0.05 75);
+  --cl-badge-warning-fg: oklch(0.45 0.13 75);
+  --cl-badge-info-bg:    oklch(0.96 0.03 250);
+  --cl-badge-info-fg:    oklch(0.45 0.13 250);
+
+  /* Ghost buttons on tinted backgrounds */
+  --cl-btn-success-bg: oklch(0.96 0.04 145);
+  --cl-btn-success-fg: oklch(0.40 0.12 145);
+  --cl-btn-danger-bg:  oklch(0.96 0.04 28);
+  --cl-btn-danger-fg:  oklch(0.50 0.16 28);
+}
+
+/* ── Color tokens — dark ──────────────────────────────── */
+[data-theme="dark"] {
+  --cl-bg:  oklch(0.16 0 0);
+  --cl-bgr: oklch(0.20 0 0);
+  --cl-bgh: oklch(0.23 0 0);
+  --cl-bd:  oklch(0.30 0 0);
+  --cl-bd2: oklch(0.28 0 0);
+  --cl-bd3: oklch(0.27 0 0);
+  --cl-bd4: oklch(0.25 0 0);
+  --cl-bd5: oklch(0.38 0 0);
+  --cl-bdi: oklch(0.33 0 0);
+  --cl-bds: oklch(0.31 0 0);
+  --cl-th:  oklch(0.93 0 0);
+  --cl-t1:  oklch(0.90 0 0);
+  --cl-t2:  oklch(0.82 0 0);
+  --cl-t3:  oklch(0.74 0 0);
+  --cl-t4:  oklch(0.70 0 0);
+  --cl-t5:  oklch(0.66 0 0);
+  --cl-t6:  oklch(0.62 0 0);
+  --cl-t7:  oklch(0.56 0 0);
+  --cl-t8:  oklch(0.50 0 0);
+  --cl-t9:  oklch(0.46 0 0);
+  --cl-pb:  oklch(0.88 0 0);
+  --cl-pf:  oklch(0.14 0 0);
+  --cl-na:  oklch(0.26 0 0);
+
+  --cl-solid:       oklch(0.82 0 0);
+  --cl-solid-fg:    oklch(0.12 0 0);
+  --cl-border-soft: oklch(0.36 0 0);
+  --cl-step-idle:   oklch(0.32 0 0);
+
+  --cl-callout-info-bg:     oklch(0.26 0.04 250);
+  --cl-callout-info-fg:     oklch(0.82 0.08 250);
+  --cl-callout-info-border: oklch(0.40 0.08 250);
+
+  --cl-hero-gradient: linear-gradient(135deg, oklch(0.28 0.05 250), oklch(0.24 0.04 145));
+
+  --cl-banner-danger-bg: oklch(0.26 0.05 28);
+  --cl-banner-danger-bd: oklch(0.42 0.08 28);
+  --cl-banner-danger-fg: oklch(0.82 0.08 28);
+  --cl-banner-danger-sub: oklch(0.65 0.06 28);
+
+  --cl-chart-fill-receita: oklch(0.28 0.06 145);
+
+  --cl-timeline-track:     oklch(0.32 0 0);
+  --cl-timeline-pending:   oklch(0.48 0 0);
+  --cl-surface-atraso:     oklch(0.26 0.04 28);
+  --cl-cal-empty:          oklch(0.22 0 0);
+  --cl-cal-pending-cell:   oklch(0.26 0 0);
+
+  --cl-text-danger:   oklch(0.78 0.12 28);
+  --cl-text-receita:  oklch(0.78 0.10 145);
+  --cl-text-despesa:  oklch(0.78 0.12 28);
+  --cl-hero-sparkline: oklch(0.72 0.12 145);
+  --cl-sparkline-neutral: oklch(0.70 0.14 250);
+
+  --cl-chart-stroke-receita: oklch(0.72 0.14 145);
+  --cl-chart-stroke-despesa: oklch(0.72 0.14 28);
+
+  --st-em_dia-dot: oklch(0.72 0.13 145);
+  --st-em_dia-bg:  oklch(0.22 0.05 145);
+  --st-em_dia-fg:  oklch(0.82 0.10 145);
+  --st-atrasado-dot: oklch(0.72 0.15 28);
+  --st-atrasado-bg:  oklch(0.24 0.05 28);
+  --st-atrasado-fg:  oklch(0.85 0.10 28);
+  --st-disponivel-dot: oklch(0.58 0.06 250);
+  --st-disponivel-bg:  oklch(0.24 0.03 250);
+  --st-disponivel-fg:  oklch(0.78 0.05 250);
+  --st-em_construcao-dot: oklch(0.75 0.12 75);
+  --st-em_construcao-bg:  oklch(0.26 0.05 75);
+  --st-em_construcao-fg:  oklch(0.85 0.10 75);
+  --st-reservada-dot: oklch(0.68 0.12 250);
+  --st-reservada-bg:  oklch(0.24 0.04 250);
+  --st-reservada-fg:  oklch(0.82 0.08 250);
+
+  --cl-partner-bar-1: oklch(0.62 0.14 250);
+  --cl-partner-bar-2: oklch(0.62 0.14 145);
+
+  --cl-badge-neutral-bg: oklch(0.30 0.02 250);
+  --cl-badge-neutral-fg: oklch(0.88 0.02 250);
+  --cl-badge-success-bg: oklch(0.28 0.06 145);
+  --cl-badge-success-fg: oklch(0.78 0.10 145);
+  --cl-badge-danger-bg:  oklch(0.28 0.06 28);
+  --cl-badge-danger-fg:  oklch(0.78 0.12 28);
+  --cl-badge-warning-bg: oklch(0.30 0.06 75);
+  --cl-badge-warning-fg: oklch(0.82 0.10 75);
+  --cl-badge-info-bg:    oklch(0.28 0.04 250);
+  --cl-badge-info-fg:    oklch(0.82 0.08 250);
+
+  --cl-btn-success-bg: oklch(0.28 0.06 145);
+  --cl-btn-success-fg: oklch(0.78 0.10 145);
+  --cl-btn-danger-bg:  oklch(0.28 0.06 28);
+  --cl-btn-danger-fg:  oklch(0.78 0.12 28);
+}
+
+body {
+  background: var(--cl-bg);
+  color: var(--cl-th);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+button { font-family: inherit; }
+input, select { font-family: inherit; color: inherit; }
+input:focus, select:focus {
+  border-color: oklch(0.62 0.13 250) !important;
+  box-shadow: 0 0 0 3px oklch(0.62 0.13 250 / 0.10);
+  outline: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

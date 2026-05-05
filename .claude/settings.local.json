@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /tmp/fall-erp/project/*.jsx /tmp/fall-erp/project/\"Fall ERP.html\")",
+      "Read(//tmp/fall-erp/project/**)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
