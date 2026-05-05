@@ -51,7 +51,7 @@ export default function Socios() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-sm font-medium text-[color:var(--cl-th)]">Distribuição de lucro</h1>
-          <p className="text-xs text-[color:var(--cl-t7)] mt-0.5">Geovanin & Paulo · 50 / 50</p>
+          <p className="text-xs text-[color:var(--cl-t7)] mt-0.5">Geovanin & Paulo · 70 / 30</p>
         </div>
         <input
           type="month"

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import type { Gasto, TipoGasto, Chacara } from '@/types/database'
+import type { Gasto, TipoGasto } from '@/types/database'
 import { fetchAllByRange } from '@/lib/supabase-paginate'
 
 const supabase = createClient(
@@ -52,6 +52,7 @@ interface FormGasto {
 }
 
 type GastoRow = Gasto & { chacara?: { identificador: string } | null }
+type ChacaraLite = { id: string; identificador: string }
 
 const FORM_VAZIO: FormGasto = {
   tipo:       'manutencao',
@@ -63,7 +64,7 @@ const FORM_VAZIO: FormGasto = {
 
 export default function Gastos() {
   const [gastos,   setGastos]   = useState<GastoRow[]>([])
-  const [chacaras, setChacaras] = useState<Chacara[]>([])
+  const [chacaras, setChacaras] = useState<ChacaraLite[]>([])
   const [loading,  setLoading]  = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [form,     setForm]     = useState<FormGasto>(FORM_VAZIO)
@@ -81,25 +82,25 @@ export default function Gastos() {
   const carregar = useCallback(async () => {
     setLoading(true)
     const [{ data: g }, { data: c }] = await Promise.all([
-      fetchAllByRange<GastoRow>((from, to) =>
-        supabase
+      fetchAllByRange<GastoRow>(async (from, to) => (
+        await supabase
           .from('gastos')
           .select('*, chacara:chacaras(identificador)')
           .gte('data_gasto', `${filtroPeriodo}-01`)
           .lte('data_gasto', `${filtroPeriodo}-31`)
           .order('data_gasto', { ascending: false })
-          .range(from, to),
-      ),
-      fetchAllByRange<Chacara>((from, to) =>
-        supabase
+          .range(from, to)
+      )),
+      fetchAllByRange<ChacaraLite>(async (from, to) => (
+        await supabase
           .from('chacaras')
           .select('id, identificador')
           .order('identificador')
-          .range(from, to),
-      ),
+          .range(from, to)
+      )),
     ])
     setGastos((g as GastoRow[]) ?? [])
-    setChacaras((c as Chacara[]) ?? [])
+    setChacaras((c as ChacaraLite[]) ?? [])
     setLoading(false)
   }, [filtroPeriodo])
 

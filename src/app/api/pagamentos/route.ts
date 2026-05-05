@@ -22,17 +22,46 @@ function getAdminClient() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+async function callRpcUntyped(
+  supabase: any,
+  fn: string,
+  args: Record<string, unknown>,
+) {
+  const client = supabase as unknown as {
+    rpc: (name: string, params?: Record<string, unknown>) => Promise<{ error: { message: string } | null }>
+  }
+  return client.rpc(fn, args)
+}
+
+async function updateVendaStatusUntyped(
+  supabase: any,
+  vendaId: string,
+  status: 'em_dia' | 'atrasado',
+) {
+  const client = supabase as unknown as {
+    from: (table: string) => {
+      update: (payload: Record<string, unknown>) => {
+        eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>
+      }
+    }
+  }
+  return client
+    .from('vendas')
+    .update({ status })
+    .eq('id', vendaId)
+}
+
 async function recalculateVendaStatus(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   vendaId: string,
 ) {
   let rpcError = null
   {
-    const { error } = await supabase.rpc('recalcular_status_venda', { p_venda_id: vendaId })
+    const { error } = await callRpcUntyped(supabase, 'recalcular_status_venda', { p_venda_id: vendaId })
     rpcError = error
   }
   if (rpcError) {
-    const { error } = await supabase.rpc('recalcular_status_venda', { venda_id: vendaId })
+    const { error } = await callRpcUntyped(supabase, 'recalcular_status_venda', { venda_id: vendaId })
     rpcError = error
   }
   if (!rpcError) return { ok: true as const, message: null }
@@ -55,10 +84,7 @@ async function recalculateVendaStatus(
     if (qErr) return { ok: false as const, message: qErr.message }
 
     const novoStatus = (pendentes?.length ?? 0) > 0 ? 'atrasado' : 'em_dia'
-    const { error: uErr } = await supabase
-      .from('vendas')
-      .update({ status: novoStatus })
-      .eq('id', vendaId)
+    const { error: uErr } = await updateVendaStatusUntyped(supabase, vendaId, novoStatus)
     if (uErr) return { ok: false as const, message: uErr.message }
     return { ok: true as const, message: null }
   }

@@ -60,16 +60,16 @@ function usePagamentosMes(mes: string) {
     const inicio = `${mes}-01`
     const fim    = `${mes}-31`
 
-    const { data, error } = await fetchAllByRange<PagamentoComDetalhe>((from, to) =>
-      supabase
+    const { data, error } = await fetchAllByRange<PagamentoComDetalhe>(async (from, to) => (
+      await supabase
         .from('v_pagamentos_mes')
         .select('*')
         .gte('data_vencimento', inicio)
         .lte('data_vencimento', fim)
         .order('dia_vencimento')
         .order('nome_cliente')
-        .range(from, to),
-    )
+        .range(from, to)
+    ))
 
     if (error) {
       setErro(error.message)
@@ -78,15 +78,15 @@ function usePagamentosMes(mes: string) {
     }
 
     // "Recebido" deve refletir caixa do mês (data de pagamento), não mês de vencimento.
-    const { data: pagosMes, error: erroPagosMes } = await fetchAllByRange<{ valor_pago: number | null }>((from, to) =>
-      supabase
+    const { data: pagosMes, error: erroPagosMes } = await fetchAllByRange<{ valor_pago: number | null }>(async (from, to) => (
+      await supabase
         .from('pagamentos')
         .select('valor_pago')
         .eq('foi_pago', true)
         .gte('data_pagamento', inicio)
         .lte('data_pagamento', fim)
-        .range(from, to),
-    )
+        .range(from, to)
+    ))
 
     if (erroPagosMes) {
       setErro(erroPagosMes.message)

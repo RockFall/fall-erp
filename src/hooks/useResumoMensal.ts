@@ -36,30 +36,30 @@ export function useResumoMensal(mes: string) {
       const fim    = `${mes}-31`
 
       const [pgRes, gastoRes, socioRes] = await Promise.all([
-        fetchAllByRange<{ foi_pago: boolean; valor_pago: number | null; valor_referencia: number; data_vencimento: string }>((from, to) =>
-          supabase
+        fetchAllByRange<{ foi_pago: boolean; valor_pago: number | null; valor_referencia: number; data_vencimento: string }>(async (from, to) => (
+          await supabase
             .from('pagamentos')
             .select('foi_pago, valor_pago, valor_referencia, data_vencimento')
             .gte('data_vencimento', inicio)
             .lte('data_vencimento', fim)
-            .range(from, to),
-        ),
-        fetchAllByRange<{ valor: number }>((from, to) =>
-          supabase
+            .range(from, to)
+        )),
+        fetchAllByRange<{ valor: number }>(async (from, to) => (
+          await supabase
             .from('gastos')
             .select('valor')
             .gte('data_gasto', inicio)
             .lte('data_gasto', fim)
-            .range(from, to),
-        ),
-        fetchAllByRange<Socio>((from, to) =>
-          supabase
+            .range(from, to)
+        )),
+        fetchAllByRange<Socio>(async (from, to) => (
+          await supabase
             .from('socios')
             .select('*')
             .eq('ativo', true)
             .order('nome')
-            .range(from, to),
-        ),
+            .range(from, to)
+        )),
       ])
 
       if (pgRes.error || gastoRes.error || socioRes.error) {
