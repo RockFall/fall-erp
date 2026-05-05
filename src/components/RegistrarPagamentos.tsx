@@ -1,13 +1,15 @@
 // components/RegistrarPagamentos.tsx
 // Tela de pagamento rápido: 1 clique para pagar, 2 cliques para valor diferente
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { Fragment } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import type {
   PagamentoComDetalhe,
   FiltroMes,
   RegistrarPagamentoPayload,
 } from '@/types/database'
+import { fetchAllByRange } from '@/lib/supabase-paginate'
 
 // ── Supabase client (instanciar no topo do app, não aqui) ──────
 const supabase = createClient(
@@ -26,6 +28,18 @@ const fmtDate = (iso: string) => {
 
 const hoje = () => new Date().toISOString().split('T')[0]
 
+const shiftMonth = (mes: string, delta: number) => {
+  const [y, m] = mes.split('-').map(Number)
+  const d = new Date(Date.UTC(y, (m - 1) + delta, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+const formatMes = (mes: string) => {
+  const [y, m] = mes.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, 1))
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
 // ── Tipos locais ───────────────────────────────────────────────
 type FormState = {
   valor: string
@@ -38,6 +52,7 @@ function usePagamentosMes(mes: string) {
   const [dados, setDados] = useState<PagamentoComDetalhe[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [recebidoMes, setRecebidoMes] = useState({ valor: 0, parcelas: 0 })
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -45,20 +60,48 @@ function usePagamentosMes(mes: string) {
     const inicio = `${mes}-01`
     const fim    = `${mes}-31`
 
-    const { data, error } = await supabase
-      .from('v_pagamentos_mes')
-      .select('*')
-      .gte('data_vencimento', inicio)
-      .lte('data_vencimento', fim)
-      .order('dia_vencimento')
-      .order('nome_cliente')
+    const { data, error } = await fetchAllByRange<PagamentoComDetalhe>((from, to) =>
+      supabase
+        .from('v_pagamentos_mes')
+        .select('*')
+        .gte('data_vencimento', inicio)
+        .lte('data_vencimento', fim)
+        .order('dia_vencimento')
+        .order('nome_cliente')
+        .range(from, to),
+    )
 
-    if (error) setErro(error.message)
-    else setDados(data as PagamentoComDetalhe[])
+    if (error) {
+      setErro(error.message)
+    } else {
+      setDados(data as PagamentoComDetalhe[])
+    }
+
+    // "Recebido" deve refletir caixa do mês (data de pagamento), não mês de vencimento.
+    const { data: pagosMes, error: erroPagosMes } = await fetchAllByRange<{ valor_pago: number | null }>((from, to) =>
+      supabase
+        .from('pagamentos')
+        .select('valor_pago')
+        .eq('foi_pago', true)
+        .gte('data_pagamento', inicio)
+        .lte('data_pagamento', fim)
+        .range(from, to),
+    )
+
+    if (erroPagosMes) {
+      setErro(erroPagosMes.message)
+      setRecebidoMes({ valor: 0, parcelas: 0 })
+    } else {
+      const arr = pagosMes ?? []
+      setRecebidoMes({
+        valor: arr.reduce((a, p) => a + (p.valor_pago ?? 0), 0),
+        parcelas: arr.length,
+      })
+    }
     setLoading(false)
   }, [mes])
 
-  return { dados, loading, erro, carregar }
+  return { dados, loading, erro, carregar, recebidoMes }
 }
 
 // ── Componente principal ───────────────────────────────────────
@@ -67,8 +110,10 @@ interface Props {
 }
 
 export default function RegistrarPagamentos({ mes }: Props) {
-  const mesSelecionado = mes ?? new Date().toISOString().slice(0, 7)
-  const { dados, loading, erro, carregar } = usePagamentosMes(mesSelecionado)
+  const [mesInterno, setMesInterno] = useState(new Date().toISOString().slice(0, 7))
+  const mesSelecionado = mes ?? mesInterno
+
+  const { dados, loading, erro, carregar, recebidoMes } = usePagamentosMes(mesSelecionado)
 
   const [filtro, setFiltro]         = useState<FiltroMes>('todos')
   const [formAberto, setFormAberto] = useState<string | null>(null)  // pagamento_id
@@ -77,7 +122,7 @@ export default function RegistrarPagamentos({ mes }: Props) {
   const [toast, setToast]           = useState<string | null>(null)
 
   // ── Carregar ao montar ────────────────────────────────────────
-  useState(() => { carregar() })
+  useEffect(() => { carregar() }, [carregar])
 
   // ── Filtro ────────────────────────────────────────────────────
   const lista = useMemo(() => {
@@ -94,18 +139,17 @@ export default function RegistrarPagamentos({ mes }: Props) {
 
   // ── Resumo ────────────────────────────────────────────────────
   const resumo = useMemo(() => {
-    const pagas     = dados.filter(p => p.foi_pago)
     const pendentes = dados.filter(p => !p.foi_pago)
     const atrasadas = pendentes.filter(p => new Date(p.data_vencimento) < new Date())
     return {
-      recebido:  pagas.reduce((a, p) => a + (p.valor_pago ?? 0), 0),
-      pagas:     pagas.length,
+      recebido:  recebidoMes.valor,
+      pagas:     recebidoMes.parcelas,
       pendente:  pendentes.reduce((a, p) => a + p.valor_referencia, 0),
       pendentes: pendentes.length,
       atraso:    atrasadas.reduce((a, p) => a + p.valor_referencia, 0),
       atrasadas: atrasadas.length,
     }
-  }, [dados])
+  }, [dados, recebidoMes])
 
   // ── Exibir toast ──────────────────────────────────────────────
   const showToast = (msg: string) => {
@@ -162,38 +206,46 @@ export default function RegistrarPagamentos({ mes }: Props) {
     payload: RegistrarPagamentoPayload,
     p: PagamentoComDetalhe,
   ) => {
-    const { error } = await supabase
-      .from('pagamentos')
-      .update({
-        foi_pago:       true,
-        valor_pago:     payload.valor_pago,
+    const res = await fetch('/api/pagamentos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'registrar',
+        pagamento_id: payload.pagamento_id,
+        venda_id: p.venda_id,
+        valor_pago: payload.valor_pago,
         data_pagamento: payload.data_pagamento,
-        observacao:     payload.observacao ?? null,
-      })
-      .eq('id', payload.pagamento_id)
-
-    if (error) {
-      showToast(`Erro: ${error.message}`)
+        observacao: payload.observacao,
+      }),
+    })
+    const json = await res.json()
+    if (!res.ok || !json?.ok) {
+      showToast(`Erro: ${json?.message ?? 'Falha ao registrar pagamento'}`)
       return
     }
-
-    // Atualizar status da venda se estava atrasada
-    await supabase.rpc('recalcular_status_venda', { p_venda_id: p.venda_id })
 
     showToast(`${p.chacara} · ${p.nome_cliente} — ${fmtBRL(payload.valor_pago)} registrado!`)
     await carregar()
   }
 
   const desfazer = async (p: PagamentoComDetalhe) => {
-    const { error } = await supabase
-      .from('pagamentos')
-      .update({ foi_pago: false, valor_pago: null, data_pagamento: null, observacao: null })
-      .eq('id', p.id)
-
-    if (!error) {
-      showToast(`Pagamento de ${p.nome_cliente} desfeito`)
-      await carregar()
+    const res = await fetch('/api/pagamentos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'desfazer',
+        pagamento_id: p.id,
+        venda_id: p.venda_id,
+      }),
+    })
+    const json = await res.json()
+    if (!res.ok || !json?.ok) {
+      showToast(`Erro ao desfazer: ${json?.message ?? 'Falha ao desfazer pagamento'}`)
+      return
     }
+
+    showToast(`Pagamento de ${p.nome_cliente} desfeito`)
+    await carregar()
   }
 
   // ── Hint de saldo inline ──────────────────────────────────────
@@ -268,6 +320,26 @@ export default function RegistrarPagamentos({ mes }: Props) {
       </div>
 
       {/* Resumo */}
+      <div className="mb-3 flex items-center justify-center gap-3">
+        <button
+          onClick={() => setMesInterno((prev) => shiftMonth(mes ?? prev, -1))}
+          className="px-2 py-1 rounded-md text-xs border border-[color:var(--cl-bd)] text-[color:var(--cl-t5)] hover:border-[color:var(--cl-bd5)]"
+          title="Mês anterior"
+        >
+          ←
+        </button>
+        <div className="min-w-44 text-center text-sm font-medium text-[color:var(--cl-th)] capitalize">
+          {formatMes(mesSelecionado)}
+        </div>
+        <button
+          onClick={() => setMesInterno((prev) => shiftMonth(mes ?? prev, 1))}
+          className="px-2 py-1 rounded-md text-xs border border-[color:var(--cl-bd)] text-[color:var(--cl-t5)] hover:border-[color:var(--cl-bd5)]"
+          title="Próximo mês"
+        >
+          →
+        </button>
+      </div>
+
       <div className="grid grid-cols-3 gap-2.5 mb-4">
         {[
           { label: 'Recebido',       value: fmtBRL(resumo.recebido),  sub: `${resumo.pagas} parcelas` },
@@ -307,10 +379,9 @@ export default function RegistrarPagamentos({ mes }: Props) {
               const f          = forms[p.id]
 
               return (
-                <>
+                <Fragment key={p.id}>
                   {/* Linha principal */}
                   <tr
-                    key={p.id}
                     className={`border-b border-[color:var(--cl-bd4)] transition-colors ${
                       isPago ? 'bg-[color:var(--cl-bgr)] opacity-60' : 'hover:bg-[color:var(--cl-bgr)]'
                     }`}
@@ -387,7 +458,7 @@ export default function RegistrarPagamentos({ mes }: Props) {
 
                   {/* Formulário inline — expande abaixo da linha */}
                   {formOpen && f && (
-                    <tr key={`form-${p.id}`} className="border-b border-[color:var(--cl-bd4)] bg-[color:var(--cl-bgr)]">
+                    <tr className="border-b border-[color:var(--cl-bd4)] bg-[color:var(--cl-bgr)]">
                       <td colSpan={8} className="px-3 py-3">
                         <div className="flex items-end gap-3 flex-wrap">
 
@@ -466,7 +537,7 @@ export default function RegistrarPagamentos({ mes }: Props) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
 

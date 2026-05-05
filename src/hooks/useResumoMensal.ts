@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import type { Socio } from '@/types/database'
+import { fetchAllByRange } from '@/lib/supabase-paginate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,21 +36,30 @@ export function useResumoMensal(mes: string) {
       const fim    = `${mes}-31`
 
       const [pgRes, gastoRes, socioRes] = await Promise.all([
-        supabase
-          .from('pagamentos')
-          .select('foi_pago, valor_pago, valor_referencia, data_vencimento')
-          .gte('data_vencimento', inicio)
-          .lte('data_vencimento', fim),
-        supabase
-          .from('gastos')
-          .select('valor')
-          .gte('data_gasto', inicio)
-          .lte('data_gasto', fim),
-        supabase
-          .from('socios')
-          .select('*')
-          .eq('ativo', true)
-          .order('nome'),
+        fetchAllByRange<{ foi_pago: boolean; valor_pago: number | null; valor_referencia: number; data_vencimento: string }>((from, to) =>
+          supabase
+            .from('pagamentos')
+            .select('foi_pago, valor_pago, valor_referencia, data_vencimento')
+            .gte('data_vencimento', inicio)
+            .lte('data_vencimento', fim)
+            .range(from, to),
+        ),
+        fetchAllByRange<{ valor: number }>((from, to) =>
+          supabase
+            .from('gastos')
+            .select('valor')
+            .gte('data_gasto', inicio)
+            .lte('data_gasto', fim)
+            .range(from, to),
+        ),
+        fetchAllByRange<Socio>((from, to) =>
+          supabase
+            .from('socios')
+            .select('*')
+            .eq('ativo', true)
+            .order('nome')
+            .range(from, to),
+        ),
       ])
 
       if (pgRes.error || gastoRes.error || socioRes.error) {

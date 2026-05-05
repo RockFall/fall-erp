@@ -1,9 +1,10 @@
 // components/Gastos.tsx
 // Tela de gastos — formulário sempre visível no topo, lista abaixo
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import type { Gasto, TipoGasto, Chacara } from '@/types/database'
+import { fetchAllByRange } from '@/lib/supabase-paginate'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,6 +51,8 @@ interface FormGasto {
   chacara_id: string
 }
 
+type GastoRow = Gasto & { chacara?: { identificador: string } | null }
+
 const FORM_VAZIO: FormGasto = {
   tipo:       'manutencao',
   valor:      '',
@@ -59,7 +62,7 @@ const FORM_VAZIO: FormGasto = {
 }
 
 export default function Gastos() {
-  const [gastos,   setGastos]   = useState<Gasto[]>([])
+  const [gastos,   setGastos]   = useState<GastoRow[]>([])
   const [chacaras, setChacaras] = useState<Chacara[]>([])
   const [loading,  setLoading]  = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -75,26 +78,34 @@ export default function Gastos() {
     setTimeout(() => setToast(null), 2500)
   }
 
-  const carregar = async () => {
+  const carregar = useCallback(async () => {
     setLoading(true)
     const [{ data: g }, { data: c }] = await Promise.all([
-      supabase
-        .from('gastos')
-        .select('*, chacara:chacaras(identificador)')
-        .gte('data_gasto', `${filtroPeriodo}-01`)
-        .lte('data_gasto', `${filtroPeriodo}-31`)
-        .order('data_gasto', { ascending: false }),
-      supabase
-        .from('chacaras')
-        .select('id, identificador')
-        .order('identificador'),
+      fetchAllByRange<GastoRow>((from, to) =>
+        supabase
+          .from('gastos')
+          .select('*, chacara:chacaras(identificador)')
+          .gte('data_gasto', `${filtroPeriodo}-01`)
+          .lte('data_gasto', `${filtroPeriodo}-31`)
+          .order('data_gasto', { ascending: false })
+          .range(from, to),
+      ),
+      fetchAllByRange<Chacara>((from, to) =>
+        supabase
+          .from('chacaras')
+          .select('id, identificador')
+          .order('identificador')
+          .range(from, to),
+      ),
     ])
-    setGastos((g as Gasto[]) ?? [])
+    setGastos((g as GastoRow[]) ?? [])
     setChacaras((c as Chacara[]) ?? [])
     setLoading(false)
-  }
+  }, [filtroPeriodo])
 
-  useEffect(() => { carregar() }, [filtroPeriodo])
+  useEffect(() => {
+    queueMicrotask(() => { void carregar() })
+  }, [carregar])
 
   const lista = useMemo(() =>
     filtroTipo === 'todos'
@@ -327,7 +338,7 @@ export default function Gastos() {
                 </td>
                 <td className="px-3 py-2.5 text-[color:var(--cl-t2)]">{g.descricao ?? '—'}</td>
                 <td className="px-3 py-2.5 text-[color:var(--cl-t5)]">
-                  {(g as any).chacara?.identificador ?? '—'}
+                  {g.chacara?.identificador ?? '—'}
                 </td>
                 <td className="px-3 py-2.5 font-medium text-[color:var(--cl-th)]">{fmtBRL(g.valor)}</td>
                 <td className="px-3 py-2.5">

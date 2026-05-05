@@ -154,7 +154,7 @@ export default function ChacarasComponent({ compact = false }: { compact?: boole
               ['em_dia', 'Em dia'],
               ['atrasado', 'Atrasado'],
               ['disponivel', 'Disponível'],
-              ['em_construcao', 'Em construção'],
+              ['em_construcao', 'Pendente'],
               ['reservada', 'Reservada'],
             ] as const).map(([v, l]) => (
               <FilterPill key={v} label={l} active={filtro === v} onClick={() => setFiltro(v)} />

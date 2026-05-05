@@ -234,8 +234,8 @@ export interface Socio {
 }
 
 export const SOCIOS: Socio[] = [
-  { id: 's1', nome: 'Geovanin', percentual: 50, ativo: true },
-  { id: 's2', nome: 'Paulo',    percentual: 50, ativo: true },
+  { id: 's1', nome: 'Geovanin', percentual: 70, ativo: true },
+  { id: 's2', nome: 'Paulo',    percentual: 30, ativo: true },
 ]
 
 /** Cores via CSS vars em globals.css — claras no :root, escuras em [data-theme="dark"] */
@@ -243,7 +243,7 @@ export const STATUS_CHACARA: Record<StatusChacara, { label: string; color: strin
   em_dia:        { label: 'Em dia',        color: 'var(--st-em_dia-dot)', bg: 'var(--st-em_dia-bg)', text: 'var(--st-em_dia-fg)' },
   atrasado:      { label: 'Atrasado',      color: 'var(--st-atrasado-dot)', bg: 'var(--st-atrasado-bg)', text: 'var(--st-atrasado-fg)' },
   disponivel:    { label: 'Disponível',    color: 'var(--st-disponivel-dot)', bg: 'var(--st-disponivel-bg)', text: 'var(--st-disponivel-fg)' },
-  em_construcao: { label: 'Em construção', color: 'var(--st-em_construcao-dot)', bg: 'var(--st-em_construcao-bg)', text: 'var(--st-em_construcao-fg)' },
+  em_construcao: { label: 'Pendente',      color: 'var(--st-em_construcao-dot)', bg: 'var(--st-em_construcao-bg)', text: 'var(--st-em_construcao-fg)' },
   reservada:     { label: 'Reservada',     color: 'var(--st-reservada-dot)', bg: 'var(--st-reservada-bg)', text: 'var(--st-reservada-fg)' },
 }
 

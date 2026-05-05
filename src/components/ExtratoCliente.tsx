@@ -147,24 +147,36 @@ interface Props {
 }
 
 export default function ExtratoCliente({ vendaId, variant = 'timeline', onBack }: Props) {
-  const { vendas, clientes, chacaras } = useRuntimeData()
+  const { vendas, clientes, chacaras, pagamentos } = useRuntimeData()
   const venda = vendas.find(v => v.id === vendaId) ?? vendas[0]
-  if (!venda) return null
-  const cliente = clientes.find(c => c.id === venda.cliente_id)
-  const chacara = chacaras.find(c => c.id === venda.chacara_id)
-  if (!cliente || !chacara) return null
 
   const parcelas = useMemo((): Parcela[] => {
+    if (!venda) return []
+    const hoje = new Date().toISOString().slice(0, 10)
+    const reais = pagamentos
+      .filter((p) => p.venda_id === venda.id)
+      .sort((a, b) => a.numero_parcela - b.numero_parcela)
+      .map((p) => ({
+        numero: p.numero_parcela,
+        data_vencimento: p.data_vencimento,
+        valor: p.valor_referencia,
+        foi_pago: p.foi_pago,
+        valor_pago: p.valor_pago,
+        data_pagamento: p.data_pagamento,
+        atrasada: !p.foi_pago && p.data_vencimento < hoje,
+      }))
+
+    if (reais.length) return reais
+
+    // Fallback defensivo caso pagamentos ainda não tenham carregado.
     const out: Parcela[] = []
-    const baseDate = new Date(venda.data_venda)
+    const baseDate = new Date(`${venda.data_venda}T00:00:00Z`)
     for (let i = 1; i <= venda.total_parcelas; i++) {
       const d = new Date(baseDate)
-      d.setMonth(d.getMonth() + i)
-      d.setDate(venda.dia_vencimento)
+      d.setUTCMonth(d.getUTCMonth() + i)
+      d.setUTCDate(venda.dia_vencimento)
       const venc = d.toISOString().slice(0, 10)
       const passada = i <= venda.parcelas_pagas
-      const isAtual = i === venda.parcelas_pagas + 1
-      const isAtrasada = isAtual && venda.status === 'atrasado'
       out.push({
         numero: i,
         data_vencimento: venc,
@@ -172,16 +184,21 @@ export default function ExtratoCliente({ vendaId, variant = 'timeline', onBack }
         foi_pago: passada,
         valor_pago: passada ? venda.valor_parcela : null,
         data_pagamento: passada ? venc : null,
-        atrasada: isAtrasada,
+        atrasada: !passada && venc < hoje,
       })
     }
     return out
-  }, [venda])
+  }, [pagamentos, venda])
+
+  if (!venda) return null
+  const cliente = clientes.find(c => c.id === venda.cliente_id)
+  const chacara = chacaras.find(c => c.id === venda.chacara_id)
+  if (!cliente || !chacara) return null
 
   const totalPago = parcelas.filter(p => p.foi_pago).reduce((a, p) => a + (p.valor_pago ?? 0), 0) + venda.valor_entrada
-  const totalDevido = venda.valor_total
+  const totalDevido = venda.valor_total > 0 ? venda.valor_total : (venda.valor_entrada + venda.valor_parcela * venda.total_parcelas)
   const saldoDevedor = totalDevido - totalPago
-  const pct = (totalPago / totalDevido) * 100
+  const pct = totalDevido > 0 ? Math.min(100, (totalPago / totalDevido) * 100) : 0
 
   const Visual = variant === 'tabela' ? ExtratoTabela : variant === 'cards' ? ExtratoCards : ExtratoTimeline
 

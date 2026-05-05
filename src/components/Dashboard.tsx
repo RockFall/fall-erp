@@ -3,35 +3,50 @@
 import { useMemo } from 'react'
 import { fmtBRL, fmtDate, labelMes, STATUS_CHACARA } from '@/lib/domain'
 import {
-  Avatar, Badge, Sparkline, ProgressBar, Card, KpiTile,
-  Icon, Button, SectionHeader,
+  Avatar, Sparkline, ProgressBar, Card, KpiTile,
+  Icon, Button,
 } from '@/components/ui'
 import ChacarasComponent from '@/components/Chacaras'
 import { useRuntimeData } from '@/hooks/useRuntimeData'
 
 // ── Shared stats hook ──────────────────────────────────────────
 function useDashStats() {
-  const { pagamentosMes, gastos, vendas, chacaras, pagamentos } = useRuntimeData()
-  const CURRENT_MONTH = new Date().toISOString().slice(0, 7)
+  const { pagamentosMes, gastos, vendas, chacaras, pagamentos, clientes } = useRuntimeData()
   const TODAY_ISO = new Date().toISOString().slice(0, 10)
   return useMemo(() => {
-    const recebido = pagamentosMes.filter(p => p.foi_pago).reduce((a, p) => a + (p.valor_pago ?? 0), 0)
-    const pendente = pagamentosMes.filter(p => !p.foi_pago).reduce((a, p) => a + p.valor_referencia, 0)
-    const atrasados = pagamentosMes.filter(p => {
-      if (p.foi_pago) return false
-      return new Date(p.data_vencimento) < new Date(TODAY_ISO)
+    const pagamentoComDetalhe = pagamentos.map((p) => {
+      const venda = vendas.find((v) => v.id === p.venda_id)
+      const cliente = venda ? clientes.find((c) => c.id === venda.cliente_id) : null
+      const chacara = venda ? chacaras.find((c) => c.id === venda.chacara_id) : null
+      return {
+        ...p,
+        nome_cliente: cliente?.nome ?? 'Cliente',
+        chacara: chacara?.identificador ?? '—',
+        dia_vencimento: venda?.dia_vencimento ?? Number(p.data_vencimento.slice(8, 10)),
+      }
     })
-    const vencendoEssaSemana = pagamentosMes.filter(p => {
+
+    const recebidoParcelas = pagamentos
+      .filter((p) => p.foi_pago)
+      .reduce((a, p) => a + (p.valor_pago ?? 0), 0)
+    const recebidoEntradas = vendas.reduce((a, v) => a + (v.valor_entrada ?? 0), 0)
+    const recebido = recebidoEntradas + recebidoParcelas
+    const pendente = pagamentosMes.filter(p => !p.foi_pago).reduce((a, p) => a + p.valor_referencia, 0)
+    const atrasados = pagamentoComDetalhe.filter(p => {
+      if (p.foi_pago) return false
+      return p.data_vencimento < TODAY_ISO
+    })
+    const vencendoEssaSemana = pagamentoComDetalhe.filter(p => {
       if (p.foi_pago) return false
       const venc = new Date(p.data_vencimento)
       const hoje = new Date(TODAY_ISO)
       const diff = (venc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)
       return diff >= 0 && diff <= 7
     })
-    const despesas = gastos.filter(g => g.data_gasto.startsWith(CURRENT_MONTH)).reduce((a, g) => a + g.valor, 0)
+    const despesas = gastos.reduce((a, g) => a + g.valor, 0)
     const lucro = recebido - despesas
-    const splitGeo = lucro > 0 ? lucro * 0.5 : 0
-    const splitPaulo = lucro > 0 ? lucro * 0.5 : 0
+    const splitGeo = lucro > 0 ? lucro * 0.7 : 0
+    const splitPaulo = lucro > 0 ? lucro * 0.3 : 0
     const contratosAtivos = vendas.length
     const chacarasDisponiveis = chacaras.filter(c => c.status === 'disponivel').length
     const receitaSeries = Array.from({ length: 6 }).map((_, i) => {
@@ -51,7 +66,7 @@ function useDashStats() {
       splitGeo, splitPaulo, contratosAtivos, chacarasDisponiveis,
       receitaSeries, despesaSeries,
     }
-  }, [pagamentosMes, gastos, vendas, chacaras, pagamentos, CURRENT_MONTH, TODAY_ISO])
+  }, [pagamentosMes, gastos, vendas, chacaras, pagamentos, clientes, TODAY_ISO])
 }
 
 function Greeting() {
@@ -78,12 +93,12 @@ function DashboardA() {
       <div style={{ marginBottom: 20 }}><Greeting /></div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
-        <KpiTile label="Recebido no mês" value={fmtBRL(s.recebido)}
-          sub={`${s.recebido > 0 ? 'Pagamentos processados' : 'Sem pagamentos no mês'}`}
+        <KpiTile label="Recebido total" value={fmtBRL(s.recebido)}
+          sub={`${s.recebido > 0 ? 'Entradas + parcelas pagas' : 'Sem recebimentos'}`}
           sparkline={s.receitaSeries} tone="success" />
         <KpiTile label="Pendente" value={fmtBRL(s.pendente)}
           sub={`${s.vencendoEssaSemana.length} vencendo nesta semana`} />
-        <KpiTile label="Em atraso" value={fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
+        <KpiTile label="A receber" value={fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
           sub={`${s.atrasados.length} contratos a cobrar`} tone="danger" />
         <KpiTile label="Lucro líquido" value={fmtBRL(s.lucro)}
           sub={`Despesas ${fmtBRL(s.despesas)}`}
@@ -96,7 +111,7 @@ function DashboardA() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cl-th)' }}>Cobrar hoje</div>
               <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginTop: 2 }}>
-                {s.atrasados.length} contratos em atraso · {fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
+                {s.atrasados.length} contratos a receber · {fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
               </div>
             </div>
             <Button variant="default" size="sm">Ver todos {Icon.arrowRight}</Button>
@@ -126,7 +141,7 @@ function DashboardA() {
 
         <Card padding={16}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cl-th)', marginBottom: 4 }}>Distribuição do mês</div>
-          <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginBottom: 14 }}>50/50 · Geovanin & Paulo</div>
+          <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginBottom: 14 }}>70/30 · Geovanin & Paulo</div>
           {[
             { nome: 'Geovanin', valor: s.splitGeo, hue: 250 },
             { nome: 'Paulo',    valor: s.splitPaulo, hue: 145 },
@@ -139,7 +154,7 @@ function DashboardA() {
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--cl-t1)' }}>{fmtBRL(soc.valor)}</span>
               </div>
-              <ProgressBar value={50} color={`oklch(0.65 0.13 ${soc.hue})`} height={5} />
+              <ProgressBar value={soc.nome === 'Geovanin' ? 70 : 30} color={`oklch(0.65 0.13 ${soc.hue})`} height={5} />
             </div>
           ))}
           <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--cl-bd4)', display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
@@ -191,7 +206,7 @@ function DashboardB() {
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'oklch(0.62 0.18 28)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{Icon.alert}</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--cl-banner-danger-fg)' }}>
-            {s.atrasados.length} pagamentos em atraso · {fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))} a recuperar
+            {s.atrasados.length} pagamentos a receber · {fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--cl-banner-danger-sub)', marginTop: 2 }}>
             Você costuma processar cobranças por dia de vencimento — comece pelo dia 5
@@ -211,7 +226,7 @@ function DashboardB() {
         <Card padding={0}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--cl-bd4)' }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--cl-th)' }}>Vencendo essa semana</div>
-            <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginTop: 2 }}>{s.vencendoEssaSemana.length} parcelas até 11/05</div>
+            <div style={{ fontSize: 11, color: 'var(--cl-t7)', marginTop: 2 }}>{s.vencendoEssaSemana.length} parcelas na próxima semana</div>
           </div>
           {s.vencendoEssaSemana.slice(0, 6).map(p => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', borderBottom: '1px solid var(--cl-bd4)' }}>
@@ -265,15 +280,15 @@ function DashboardC() {
           color: 'white', border: 'none',
         }}>
           <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Lucro líquido · {labelMes(new Date().toISOString().slice(0, 7))}
+            Lucro líquido acumulado
           </div>
           <div style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em' }}>{fmtBRL(s.lucro)}</div>
           <div style={{ display: 'flex', gap: 24, marginTop: 16, fontSize: 11, opacity: 0.85 }}>
             {[
               { label: 'Receita',        value: s.recebido },
               { label: 'Despesas',       value: s.despesas },
-              { label: 'Geovanin (50%)', value: s.splitGeo },
-              { label: 'Paulo (50%)',    value: s.splitPaulo },
+              { label: 'Geovanin (70%)', value: s.splitGeo },
+              { label: 'Paulo (30%)',    value: s.splitPaulo },
             ].map(item => (
               <div key={item.label}>
                 <div style={{ opacity: 0.7 }}>{item.label}</div>
@@ -287,7 +302,7 @@ function DashboardC() {
         </Card>
 
         <Card padding={16}>
-          <div style={{ fontSize: 12, color: 'var(--cl-t7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atrasos</div>
+          <div style={{ fontSize: 12, color: 'var(--cl-t7)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>A receber</div>
           <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--cl-text-danger)', letterSpacing: '-0.02em' }}>
             {fmtBRL(s.atrasados.reduce((a, p) => a + p.valor_referencia, 0))}
           </div>

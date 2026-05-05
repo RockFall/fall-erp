@@ -92,6 +92,37 @@ function parseIntSafe(raw) {
   return m ? Number(m[0]) : null
 }
 
+function parseMes(raw) {
+  const t = normalizeSpaces(raw)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  if (!t) return null
+  if (t.startsWith('jan')) return 1
+  if (t.startsWith('fev')) return 2
+  if (t.startsWith('mar')) return 3
+  if (t.startsWith('abr')) return 4
+  if (t.startsWith('mai')) return 5
+  if (t.startsWith('jun')) return 6
+  if (t.startsWith('jul')) return 7
+  if (t.startsWith('ago')) return 8
+  if (t.startsWith('set')) return 9
+  if (t.startsWith('out')) return 10
+  if (t.startsWith('nov')) return 11
+  if (t.startsWith('dez')) return 12
+  return null
+}
+
+function parseAnoFromHeader(raw) {
+  const t = normalizeSpaces(raw)
+  if (!t) return null
+  const m = t.match(/(?:\/|-)(\d{2,4})$/)
+  if (!m) return null
+  let y = Number(m[1])
+  if (y < 100) y += 2000
+  return y
+}
+
 function toIsoDate(raw, fallbackYear = null) {
   const txt = normalizeSpaces(raw).replace(/"/g, '')
   if (!txt) return null
@@ -106,6 +137,140 @@ function toIsoDate(raw, fallbackYear = null) {
   if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null
 
   return `${String(yyyy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
+}
+
+function buildPaymentTriplets(headerMeses, headerCampos) {
+  const triplets = []
+  let currentMonth = null
+  let currentYear = null
+  let anchorFound = false
+
+  for (let i = 0; i < headerCampos.length; i += 1) {
+    const monthRaw = normalizeSpaces(headerMeses[i])
+    if (monthRaw) {
+      const maybeMonth = parseMes(monthRaw)
+      if (maybeMonth) {
+        currentMonth = maybeMonth
+        const explicitYear = parseAnoFromHeader(monthRaw)
+        if (explicitYear) {
+          currentYear = explicitYear
+          anchorFound = true
+        } else if (anchorFound && currentYear != null) {
+          // Só avança o ano quando voltamos de dezembro para janeiro.
+          // Sem ano explícito, mantemos o último ano conhecido.
+        }
+      }
+    }
+
+    const campo = normalizeSpaces(headerCampos[i]).toLowerCase()
+    const prox = normalizeSpaces(headerCampos[i + 1]).toLowerCase()
+    const prox2 = normalizeSpaces(headerCampos[i + 2]).toLowerCase()
+    const isValor = campo === 'valor' || campo === 'valor '
+    const isParcela = prox === 'parcela' || prox === 'paecela'
+    const isData = prox2 === 'data'
+
+    if (isValor && isParcela && isData) {
+      triplets.push({
+        start: i,
+        month: currentMonth,
+        year: currentYear,
+      })
+    }
+  }
+
+  // Preenche anos faltantes olhando o primeiro bloco com ano conhecido.
+  const firstWithYear = triplets.findIndex((t) => t.year != null)
+  if (firstWithYear !== -1) {
+    for (let i = firstWithYear - 1; i >= 0; i -= 1) {
+      const next = triplets[i + 1]
+      const cur = triplets[i]
+      if (cur.year != null) continue
+      if (cur.month == null || next.year == null || next.month == null) continue
+      cur.year = cur.month > next.month ? next.year - 1 : next.year
+    }
+    for (let i = firstWithYear + 1; i < triplets.length; i += 1) {
+      const prev = triplets[i - 1]
+      const cur = triplets[i]
+      if (cur.year != null) continue
+      if (cur.month == null || prev.year == null || prev.month == null) continue
+      cur.year = cur.month < prev.month ? prev.year + 1 : prev.year
+    }
+  }
+
+  return triplets
+}
+
+function parseParcelaNumbers(raw, totalParcelas) {
+  const txt = normalizeSpaces(raw)
+  if (!txt) return []
+  const nums = (txt.match(/\d+/g) ?? []).map(Number).filter((n) => Number.isFinite(n) && n > 0)
+  if (!nums.length) return []
+
+  let out = nums
+  // Caso "6/96" (parcela/total), descartamos o total quando bate com total_parcelas.
+  if (out.length === 2 && out[1] === totalParcelas && out[0] < out[1]) {
+    out = [out[0]]
+  }
+
+  const dedup = []
+  for (const n of out) {
+    if (n > totalParcelas) continue
+    if (!dedup.includes(n)) dedup.push(n)
+  }
+  return dedup
+}
+
+function inferTotalParcelasFromPagamentos(cols, triplets) {
+  let maxParcela = null
+  let hintedTotal = null
+
+  for (const t of triplets) {
+    const txt = normalizeSpaces(cols[t.start + 1])
+    if (!txt) continue
+    const nums = (txt.match(/\d+/g) ?? []).map(Number).filter((n) => Number.isFinite(n) && n > 0)
+    if (!nums.length) continue
+
+    if (nums.length >= 2) {
+      const [first, second] = nums
+      // Formato comum na planilha: "6/96" (parcela atual / total do contrato).
+      if (second > first && second <= 360) {
+        hintedTotal = Math.max(hintedTotal ?? 0, second)
+      }
+    }
+
+    for (const n of nums) {
+      if (n <= 360) maxParcela = Math.max(maxParcela ?? 0, n)
+    }
+  }
+
+  return hintedTotal ?? maxParcela
+}
+
+function extractPagamentosFromRow(cols, triplets, totalParcelas) {
+  const out = []
+  for (const t of triplets) {
+    const valorRaw = cols[t.start]
+    const parcelaRaw = cols[t.start + 1]
+    const dataRaw = cols[t.start + 2]
+    const valor = parseMoney(valorRaw)
+    const parcelas = parseParcelaNumbers(parcelaRaw, totalParcelas)
+    const data = toIsoDate(dataRaw, t.year ?? null)
+
+    if (valor == null || valor <= 0) continue
+    if (!parcelas.length) continue
+
+    out.push({ valor, parcelas, data })
+  }
+  return out
+}
+
+function splitAmount(total, parts) {
+  if (parts <= 1) return [Number(total.toFixed(2))]
+  const base = Number((total / parts).toFixed(2))
+  const arr = Array.from({ length: parts }, () => base)
+  const sumBase = Number(arr.reduce((a, b) => a + b, 0).toFixed(2))
+  arr[arr.length - 1] = Number((arr[arr.length - 1] + (total - sumBase)).toFixed(2))
+  return arr
 }
 
 function normalizeTelefone(raw) {
@@ -166,11 +331,12 @@ async function clearData() {
   }
 }
 
-async function insertRows(rows) {
+async function insertRows(rows, triplets) {
   const empreendimentoId = await getEmpreendimentoId()
   const chacaraById = new Map()
   const clienteByKey = new Map()
   let vendasCriadas = 0
+  let pagamentosAplicados = 0
   const seenByChacara = new Map()
 
   for (const cols of rows) {
@@ -196,7 +362,11 @@ async function insertRows(rows) {
 
     const valorTotal = parseMoney(cols[2]) ?? 0
     const valorEntrada = parseMoney(cols[3]) ?? 0
-    const totalParcelas = parseIntSafe(cols[4]) ?? 1
+    const totalParcelasColuna = parseIntSafe(cols[4])
+    const totalParcelasInferido = inferTotalParcelasFromPagamentos(cols, triplets)
+    const totalParcelas = totalParcelasColuna
+      ?? totalParcelasInferido
+      ?? 1
     const valorParcelaRaw = parseMoney(cols[5])
     const valorParcela = valorParcelaRaw ?? ((valorTotal - valorEntrada) > 0 ? Number(((valorTotal - valorEntrada) / Math.max(1, totalParcelas)).toFixed(2)) : 0)
 
@@ -267,12 +437,57 @@ async function insertRows(rows) {
     if (rpcErr) {
       throw new Error(`Venda ${venda.id} criada, mas falhou gerar plano_pagamentos: ${rpcErr.message}`)
     }
+
+    const pagamentosExtraidos = extractPagamentosFromRow(cols, triplets, totalParcelas)
+    if (pagamentosExtraidos.length) {
+      const { data: parcelasDb, error: pErr } = await supabase
+        .from('pagamentos')
+        .select('id,numero_parcela,valor_referencia')
+        .eq('venda_id', venda.id)
+      if (pErr) throw new Error(`Erro consultando pagamentos da venda ${venda.id}: ${pErr.message}`)
+
+      const byNumero = new Map((parcelasDb ?? []).map((p) => [Number(p.numero_parcela), p]))
+      const updates = []
+
+      for (const registro of pagamentosExtraidos) {
+        const parcelasAlvo = registro.parcelas.filter((n) => byNumero.has(n))
+        if (!parcelasAlvo.length) continue
+        const valores = splitAmount(registro.valor, parcelasAlvo.length)
+        for (let i = 0; i < parcelasAlvo.length; i += 1) {
+          const numero = parcelasAlvo[i]
+          const row = byNumero.get(numero)
+          updates.push({
+            id: row.id,
+            foi_pago: true,
+            valor_pago: valores[i],
+            data_pagamento: registro.data,
+          })
+        }
+      }
+
+      // Mantém apenas a atualização mais recente por parcela/id.
+      const latestById = new Map()
+      for (const u of updates) latestById.set(u.id, u)
+      for (const u of latestById.values()) {
+        const { error } = await supabase
+          .from('pagamentos')
+          .update({
+            foi_pago: u.foi_pago,
+            valor_pago: u.valor_pago,
+            data_pagamento: u.data_pagamento,
+          })
+          .eq('id', u.id)
+        if (error) throw new Error(`Erro atualizando pagamento ${u.id}: ${error.message}`)
+        pagamentosAplicados += 1
+      }
+    }
   }
 
   return {
     chacaras: chacaraById.size,
     clientes: clienteByKey.size,
     vendas: vendasCriadas,
+    pagamentos_aplicados: pagamentosAplicados,
     linhas_apos_dedupe: dedupedRows.length,
   }
 }
@@ -287,11 +502,14 @@ async function main() {
   const content = fs.readFileSync(abs, 'utf8')
   const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0)
   const rows = lines.map(parseCsvLine)
+  const headerMeses = rows[0] ?? []
+  const headerCampos = rows[1] ?? []
+  const triplets = buildPaymentTriplets(headerMeses, headerCampos)
   const dataRows = rows.slice(2)
 
   if (dryRun) {
     const valid = dataRows.filter((r) => !shouldSkipRow(r))
-    console.log(`Dry-run OK. Linhas totais: ${dataRows.length} | Linhas válidas: ${valid.length}`)
+    console.log(`Dry-run OK. Linhas totais: ${dataRows.length} | Linhas válidas: ${valid.length} | Blocos pagamento: ${triplets.length}`)
     process.exit(0)
   }
 
@@ -303,7 +521,7 @@ async function main() {
   console.log('Limpando dados existentes...')
   await clearData()
   console.log('Importando CSV...')
-  const result = await insertRows(dataRows)
+  const result = await insertRows(dataRows, triplets)
   console.log('Importação concluída:')
   console.log(result)
 }
